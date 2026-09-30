@@ -1,0 +1,9 @@
+# Python caches
+__pycache__/
+.ipynb_checkpoints/
+
+# Lecture material (the instructor's files, not yours to publish)
+from_lecture/
+
+# Report (kept local)
+LaTeX/

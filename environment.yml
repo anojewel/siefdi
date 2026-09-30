@@ -1,0 +1,11 @@
+name: siefdi
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.14
+  - manim
+  - numpy
+  - scipy
+  - matplotlib
+  - ipykernel
