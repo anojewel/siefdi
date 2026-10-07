@@ -53,12 +53,6 @@ class SystemLinearEquations:
 
     # Gauss-Seidel Code starts here
     def gauss_seidel(self, initial_guess, tolerance, max_iterations=100_000):
-        """🤖 [CLAUDE] Solve the system by Gauss-Seidel sweeps, starting from initial_guess.
-
-        initial_guess can be one number (used for every cell) or a full vector.
-        Sweeps stop when max|x^(k) - x^(k-1)| < tolerance, or after max_iterations.
-        Returns the solved SystemLinearEquations and the number of sweeps it took.
-        """
         # Take the values from the class attribute
         matrix = self.matrix
         rhs = self.rhs_vector
