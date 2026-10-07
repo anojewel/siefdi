@@ -1,64 +1,71 @@
 import numpy as np
-
+from functools import cached_property
 class RectangleSpace:
     """🤖 [CLAUDE] Axis-aligned rectangular domain, always stored as 3D.
 
-    The domain spans ``[negative_min[axis], positive_max[axis]]`` along each axis.
+    The domain is described by one ``bounds`` array of shape (3, 2), laid out
+    like ``SimpleWallBC``: one row per axis (x, y, z) and one column per side
+    (negative, positive). Axis ``i`` spans ``[bounds[i, 0], bounds[i, 1]]``.
     1D and 2D input is padded to 3D: each missing axis spans ``[0, 1]``, so
     areas and volumes are then per unit length (or per unit area) of the
-    missing directions. To use real sizes, pass all three extents yourself.
+    missing directions. To use real sizes, pass all three rows yourself.
     Use ``grid()`` to discretise the domain into a mesh.
 
     Attributes:
         dim (int): Number of spatial dimensions after padding, always 3.
-        negative_min (np.ndarray): Lower bound of the domain on each axis, shape (3,).
-        positive_max (np.ndarray): Upper bound of the domain on each axis, shape (3,).
+        bounds (np.ndarray): Lower and upper bound on each axis, shape (3, 2).
+        negative_min (np.ndarray): Lower bound on each axis, ``bounds[:, 0]``, shape (3,).
+        positive_max (np.ndarray): Upper bound on each axis, ``bounds[:, 1]``, shape (3,).
     """
 
-    # TODO: maybe take one (3, 2) bounds array, to match SimpleWallBC's layout
-    def __init__(self, negative_min, positive_max):
-        """🤖 [CLAUDE] Create the domain from its lower and upper bounds.
+    def __init__(self, bounds):
+        """🤖 [CLAUDE] Create the domain from its bounds.
 
         Args:
-            negative_min (float or array-like): Lower bound per axis, 1 to 3
-                entries. A scalar means 1D. Missing axes are padded with 0.
-            positive_max (float or array-like): Upper bound per axis, 1 to 3
-                entries. A scalar means 1D. Missing axes are padded with 1.
+            bounds (array-like): ``[[x_min, x_max], [y_min, y_max], [z_min, z_max]]``,
+                with 1 to 3 rows. A single pair ``[x_min, x_max]`` means 1D.
+                Missing rows are padded with ``[0, 1]``.
 
         Raises:
-            ValueError: If ``negative_min`` and ``positive_max`` have different
-                lengths, or more than 3 entries.
+            ValueError: If ``bounds`` doesn't have 2 columns, has more than 3 rows,
+                or has a row where min is not smaller than max.
         """
-        ### Coerce the lengths input into array:
-        normalized_positive_max = np.atleast_1d(np.asarray(positive_max, dtype=float))
-        normalized_negative_min = np.atleast_1d(np.asarray(negative_min, dtype=float))
+        ### Coerce bounds into a 2D array (a single pair [min, max] becomes one row)
+        bounds = np.atleast_2d(np.asarray(bounds, dtype=float))
 
-        # Check if two objects are in agreement
-        if len(normalized_positive_max) == len(normalized_negative_min):
-            self.dim = len(normalized_positive_max)
-            self.positive_max = normalized_positive_max
-            self.negative_min = normalized_negative_min 
-        else:
-            raise ValueError(f"expected positive_len and negative_len to be equal dimensions, got {len(normalized_positive_max)} and {len(normalized_negative_min)}")
+        ### Check shape: one row per axis, two columns (negative, positive)
+        if bounds.ndim != 2 or bounds.shape[1] != 2:
+            raise ValueError(f"expected bounds with shape (n, 2), got {bounds.shape}")
+        if bounds.shape[0] > 3:
+            raise ValueError(f"expected at most 3 rows in bounds, got {bounds.shape[0]}")
 
-        if self.dim > 3:
-            raise ValueError(f"expected positive_max or negative_min lengths to be less or equal to 3, got {self.dim}")
-        
-        # Pad the missing values with unit length to the positive side
-        self.positive_max = np.pad(self.positive_max, (0, 3-len(self.positive_max)), constant_values = 1.)
-        self.negative_min = np.pad(self.negative_min, (0, 3-len(self.negative_min)), constant_values = 0.)
+        ### Check every axis has min < max (otherwise cell widths come out zero or negative)
+        if not np.all(bounds[:, 0] < bounds[:, 1]):
+            raise ValueError(f"expected bounds[:, 0] < bounds[:, 1] on every axis, got {bounds.tolist()}")
 
-        self.dim = len(self.positive_max)
-                             
-    def grid(self, cuts, centre_type:str):
+        ### Pad the missing axes with unit length rows [0, 1]
+        missing_rows = np.tile([0., 1.], (3 - bounds.shape[0], 1))
+        self.bounds = np.vstack([bounds, missing_rows])
+
+        ### Split into the two sides (grid() reads these)
+        self.negative_min = self.bounds[:, 0]
+        self.positive_max = self.bounds[:, 1]
+
+        self.dim = self.bounds.shape[0]
+
+    def grid(self,centre_type:str,cuts):
         """🤖 [CLAUDE] Discretise the domain into a uniform grid.
 
+        Choose the kind of grid first, then how many cells it has, e.g.
+        ``space.grid('cell', [10, 4])``.
+
         Args:
+            centre_type (str): The kind of grid. ``'cell'`` gives a cell-centred
+                grid, where faces are placed first and nodes sit midway between
+                them. ``'vertex'`` is reserved for a vertex-centred grid, which
+                is not implemented yet.
             cuts (int or array-like of int): Number of control volumes per axis,
                 1 to 3 entries. A scalar means 1D. Missing axes get 1 cell.
-            centre_type (str): ``'cell'`` for a cell-centred grid, where faces are
-                placed first and nodes sit midway between them. ``'vertex'`` is
-                reserved for a vertex-centred grid, which is not implemented yet.
 
         Returns:
             CellCentredGrid: The grid when ``centre_type == 'cell'``.
@@ -133,22 +140,25 @@ class CellCentredGrid:
 
         ### 2. DIMENSION
         self.dim = len(faces)
-
+    
         ### 3. CENTRE POSITIONS
-
+    @cached_property
+    def centres(self):
         # Centres are in between each face:
         centres_list = []
         for axis in range(self.dim):
-            singledim_faces = faces[axis]
+            singledim_faces = self.faces[axis]
             singledim_centres = (singledim_faces[:-1] + singledim_faces[1:])/2
             centres_list.append(singledim_centres)
-        # Store instance attribute
-        self.centres = centres_list
-
-        ### 4. SHAPE (number of cells per axis)
-        self.shape = tuple([len(row) for row in self.centres])
-
+        return centres_list
+        ### 4. Grid Shape
+    @cached_property
+    def shape(self):
+        return tuple(len(row) for row in self.centres)
+    
         ### 5. CENTRE SPACING (centre-to-centre; first/last entries will be wall-to-centre)
+    @cached_property
+    def centre_spacing(self):
         centre_spacing_list = []
         for axis in range(self.dim):
             singledim_centres = self.centres[axis]
@@ -164,19 +174,23 @@ class CellCentredGrid:
 
             centre_spacing_list.append(singledim_centre_spacing)
 
-        self.centre_spacing = centre_spacing_list
-
-        # TODO: non-uniform grids would need cell_lengths, areas and volumes per cell, not per axis
+        return centre_spacing_list
         ### 6. CELL LENGTHS (uniform grid: one face-to-face width per axis)
         # Every cell along an axis has the same width, so the first two faces are enough
-        self.cell_lengths = np.array([singledim_faces[1] - singledim_faces[0] for singledim_faces in self.faces])
+    @cached_property
+    def cell_lengths(self):
+        return np.array([singledim_faces[1] - singledim_faces[0] for singledim_faces in self.faces])
 
         ### 7. SURFACE AREAS (one per axis: the face normal to an axis spans the other two axes)
+    @cached_property
+    def areas(self):
         # np.delete drops this axis's length, leaving the two lengths that span the face
-        self.areas = np.array([np.prod(np.delete(self.cell_lengths, axis)) for axis in range(self.dim)])
-
+        return np.array([np.prod(np.delete(self.cell_lengths, axis)) for axis in range(self.dim)])
+        
+    @cached_property
+    def volumes(self):
         ### 8. VOLUMES (every cell has the same volume on a uniform grid)
-        self.cell_vol = np.prod(self.cell_lengths)
+        return np.prod(self.cell_lengths)
 
 
              
