@@ -124,7 +124,7 @@ class CellCentredGrid:
             axis, shape (3,): ``[Δx, Δy, Δz]``.
         areas (np.ndarray): Area of the faces normal to each axis, shape (3,):
             ``[Δy·Δz, Δx·Δz, Δx·Δy]``.
-        cell_vol (float): Volume of every cell, ``Δx·Δy·Δz``.
+        volume (float): Volume of every cell, ``Δx·Δy·Δz``.
     """
 
     def __init__(self, faces):
@@ -188,7 +188,7 @@ class CellCentredGrid:
         return np.array([np.prod(np.delete(self.cell_lengths, axis)) for axis in range(self.dim)])
         
     @cached_property
-    def volumes(self):
+    def volume(self):
         ### 8. VOLUMES (every cell has the same volume on a uniform grid)
         return np.prod(self.cell_lengths)
 
