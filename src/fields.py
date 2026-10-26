@@ -48,4 +48,10 @@ class InternalScalarField:
         else:
             raise TypeError(f"Expected a boundary condition object, got {type(bcs)}")
         self.values = values
+        # Keep a copy of the starting values so a march can start over
+        self.initial_values = None if values is None else np.copy(values) 
+
+    def reset(self):  
+        # Copy again so marching never touches initial_values
+        self.values = np.copy(self.initial_values)  
 

@@ -8,3 +8,4 @@ so please use the tag link for grading.
 | 1 | 1D steady heat conduction | [`assignment-1`](https://github.com/anojewel/siefdi/tree/assignment-1) |
 | 2 | TDMA and Gauss-Seidel for 1D steady heat conduction | [`assignment-2`](https://github.com/anojewel/siefdi/tree/assignment-2) |
 | 3 | Explicit FVM for 1D unsteady heat conduction | [`assignment-3`](https://github.com/anojewel/siefdi/tree/assignment-3) |
+| Midterm | Fully implicit FVM for 1D unsteady heat conduction, compared with explicit | [`midterm`](https://github.com/anojewel/siefdi/tree/midterm) |

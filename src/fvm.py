@@ -99,10 +99,32 @@ class Transient:
  
 class March:
     def __init__(self, diffusion, transient, time_step):
+        ### Both terms must act on the same field object, then the march keeps it
+        if transient.field is not diffusion.field:  
+            raise ValueError("Expected diffusion and transient to share the same field object") 
+        self.field = diffusion.field  
         self.diffusion = diffusion
         self.transient = transient
         self.time_step = time_step
+
+    # Moved here from ExplicitMarch so ExplicitMarch and ImplicitMarch share the same loop
+    def record_run(self, t_end, save_every=1):
+        n_steps = round(t_end / self.time_step)
+        frames = []
+        for n in range(1, n_steps + 1):
+            t = n * self.time_step
+            self.run()
+            # Record
+            if n % save_every == 0:
+                single_frame = t,self.diffusion.field.values.copy()
+                frames.append(single_frame)
+        return ScalarHistory(frames)
+
 class ExplicitMarch(March):
+    def __init__(self, diffusion, transient, time_step, check_stability=True):  
+        super().__init__(diffusion, transient, time_step)  
+        #  False lets us march past the limit on purpose, to see what goes wrong
+        self.check_stability = check_stability  
     def max_time_step(self):
         f = self.diffusion.field
         g = f.grid
@@ -117,26 +139,27 @@ class ExplicitMarch(March):
         b = self.diffusion.source_vector()
         dt = self.time_step
         ### CHECK IF TIME STEP IS SMALL ENOUGH
-        if self.time_step < max_time:
+        if self.time_step < max_time or not self.check_stability: 
             ### MARCHING FORMULA HERE
             T = dt/(self.transient.coefficient * g.volume) * (-A@T + b) + T
             # update field (transient and diffusion both point to the same field)
             self.transient.field.values = T
         else:
             raise ValueError(f"Expected time_step to be less than {max_time} got {self.time_step}")
-    def record_run(self, t_end, save_every=1):
-        n_steps = round(t_end / self.time_step)   
-        frames = []
-        for n in range(1, n_steps + 1):           
-            t = n * self.time_step
-            self.run()
 
-            # Record
-            if n % save_every == 0:
-                single_frame = t,self.diffusion.field.values.copy()
-                frames.append(single_frame)
-        return ScalarHistory(frames)
-            
+class ImplicitMarch(March):
+    def run(self):
+        T = self.field.values  # T(t)
+        A = self.diffusion.matrix()  
+        b = self.diffusion.source_vector() 
+        g = self.field.grid  
+        dt = self.time_step  
+        ### MARCHING FORMULA HERE: M T(t+Δt) = (ρcΔV/Δt) T(t) + b
+        a_old = self.transient.coefficient * g.volume / dt  # ρcΔV/Δt
+        M = a_old * np.eye(g.shape[0]) + A  
+        sle = SystemLinearEquations(matrix = M, rhs_vector = a_old*T + b)  #
+        # update field with the TDMA solution (transient and diffusion both point to the same field)
+        self.field.values = sle.thomas().unknown_vector  
 
 
         
