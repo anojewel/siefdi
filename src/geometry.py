@@ -193,8 +193,6 @@ class CellCentredGrid:
         return np.prod(self.cell_lengths)
 
 
-             
-            
         
 class VertexCenteredGrid:
     """🤖 [CLAUDE] Placeholder for a vertex-centred grid (nodes placed first, faces between them). Not implemented."""

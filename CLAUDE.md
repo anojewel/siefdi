@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-## Docstrings
+## 👾 marker
 
-- Any docstring Claude writes must start with the robot emoji followed by `[CLAUDE]`, e.g. `"""🤖 [CLAUDE] Build the coefficient matrix."""`. This marks it as Claude-written, as opposed to the user's own.
-- Only add docstrings; don't change the user's code unless asked. This is a learning project, and the user writes the code.
+- Mark everything Claude writes in code with the purple alien emoji followed by `[CLAUDE]`. For a docstring that looks like `"""👾 [CLAUDE] Build the coefficient matrix."""`, and for added or changed lines it is a comment like `# 👾 [CLAUDE] ...`.
+- The marker is an unread flag. It shows the user what Claude added, so they can go back and read it. Once they have read it, they delete the marker, and a missing marker means "read". Don't add it back.

@@ -7,3 +7,9 @@ from_lecture/
 
 # Report (kept local)
 LaTeX/
+
+# macOS
+.DS_Store
+
+# Exported PDFs (kept local)
+*.pdf

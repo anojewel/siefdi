@@ -96,6 +96,46 @@ class Transient:
     def __init__(self, field, coefficient):
         self.field = field
         self.coefficient = coefficient
+
+class Convection:
+    def __init__(self, field, coefficient, velocity):
+        self.field = field
+        self.coefficient = coefficient
+        self.velocity = velocity
+    def fluxes(self):
+        g = self.field.grid
+        rho = self.coefficient
+        u = self.velocity
+        # FORMULA IS APPLIED HERE
+        F = rho*u*g.areas[0]
+        return F
+    def matrix(self):
+        F = self.fluxes()
+        g = self.field.grid
+        N = g.shape[0]
+        # FORMULA IS HERE
+        aP = max(F, 0) + max(-F, 0)
+        aE = max(-F, 0)
+        aW = max(F, 0)
+
+        M = (np.diag(aP * np.ones(N))            # main diagonal, N entries
+            + np.diag(-aE * np.ones(N - 1), 1)   # above: east neighbour, N-1 entries
+            + np.diag(-aW * np.ones(N - 1), -1)) # below: west neighbour, N-1 entries
+        return M
+
+    def source_vector(self):
+        F = self.fluxes()
+        wall_values = self.field.bcs.wall_values
+        N = self.field.grid.shape[0]
+        b = np.zeros(N)
+        # FORMULA IS HERE
+        # West wall: flow to the right (F > 0) carries φ_0 into the first cell
+        b[0] = max(F, 0) * wall_values[0,0]
+        # East wall: flow to the left (F < 0) carries φ_L into the last cell
+        b[-1] = max(-F, 0) * wall_values[0,1]
+        return b
+        
+    
  
 class March:
     def __init__(self, diffusion, transient, time_step):
